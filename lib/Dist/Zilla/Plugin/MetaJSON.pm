@@ -2,11 +2,13 @@ package Dist::Zilla::Plugin::MetaJSON;
 # ABSTRACT: produce a META.json
 use Moose;
 use Moose::Autobox;
+use Moose::Util::TypeConstraints;
 with 'Dist::Zilla::Role::FileGatherer';
 
 use namespace::autoclean;
 
 use Dist::Zilla::File::FromCode;
+use Encode qw(decode);
 
 =head1 DESCRIPTION
 
@@ -44,6 +46,20 @@ has version => (
   default => '2',
 );
 
+=attr encoding
+
+If given, parameter lets you pick what encoding to use when generating the
+output. You can use one of following encodings: C<ascii>, C<latin1>, C<utf8>.
+It defaults to C<ascii>.
+
+=cut
+
+has encoding => (
+  is  => 'ro',
+  isa => enum([qw( ascii latin1 utf8 )]),
+  default => 'ascii',
+);
+
 sub gather_files {
   my ($self, $arg) = @_;
 
@@ -72,8 +88,18 @@ sub gather_files {
       my $converter = CPAN::Meta::Converter->new($distmeta);
       my $output    = $converter->convert(version => $self->version);
 
-      JSON->new->ascii(1)->canonical(1)->pretty->encode($output)
-      . "\n";
+      if ($self->encoding eq 'latin1') {
+        JSON->new->latin1(1)->canonical(1)->pretty->encode($output)
+        . "\n";
+      }
+      elsif ($self->encoding eq 'utf8') {
+        decode('utf-8', JSON->new->utf8(1)->canonical(1)->pretty->encode($output))
+        . "\n";
+      }
+      else {
+        JSON->new->ascii(1)->canonical(1)->pretty->encode($output)
+        . "\n";
+      }
     },
   });
 
